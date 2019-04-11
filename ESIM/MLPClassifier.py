@@ -10,6 +10,6 @@ class MLP(nn.Module):
 
     def forward(self, value):
         tmp = self.line(value)
-        tmp = nn.functional.tanh(tmp)
+        tmp = torch.tanh(tmp)
         score = self.classfier(tmp)
         return score

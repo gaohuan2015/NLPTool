@@ -55,6 +55,16 @@ class ESIM(nn.Module):
         # encoder sentence
         sentence1_embedding = self.sentence_encoder(sentence1, length1)
         sentence2_embedding = self.sentence_encoder(sentence2, length2)
+        # pad again
+        if length1[0] >= length2[0]:
+            mask = Utilities.build_mask(
+                sentence1.shape[0], length1[0], length2[0])
+            sentence2_embedding = mask.bmm(sentence2_embedding)
+        else:
+            mask = Utilities.build_mask(
+                sentence2.shape[0], length2[0], length1[0])
+            sentence1_embedding = mask.bmm(sentence1_embedding)
+
         # similarity between two sentences
         similarity_matrix = self.get_similarity(
             sentence1_embedding, sentence2_embedding)
@@ -81,8 +91,12 @@ class ESIM(nn.Module):
         composition1, _ = self.composition(projection1)
         composition2, _ = self.composition(projection2)
         # classifier
-        mask1 = Utilities.get_mask(sentence1.shape[0], length1)
-        mask2 = Utilities.get_mask(sentence2.shape[0], length2)
+        if length1[0] >= length2[0]:
+            mask1 = Utilities.get_mask(sentence1.shape[0], length1[0], length1)
+            mask2 = Utilities.get_mask(sentence2.shape[0], length1[0], length2)
+        else:
+            mask1 = Utilities.get_mask(sentence1.shape[0], length2[0], length1)
+            mask2 = Utilities.get_mask(sentence2.shape[0], length2[0], length2)
         v_avg1 = torch.sum((composition1 * mask1) /
                            torch.sum(mask1, 1).unsqueeze(-1), 1)
         v_avg2 = torch.sum((composition2 * mask2) /
