@@ -59,8 +59,8 @@ if __name__ == "__main__":
     t1 = []
     t2 = []
     test_tag = [0, 1]
-    test_sentence1 = 'How To Learn Java Programming Language'
-    test_sentence2 = 'How do I learn a computer language like java?'
+    test_sentence1 = 'war III?'
+    test_sentence2 = 'World War 3?'
     t1.append(Utilities.prepare_sequence(test_sentence1, word_to_idx))
     t2.append(Utilities.prepare_sequence(test_sentence2, word_to_idx))
     # build data loader
