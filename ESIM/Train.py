@@ -31,21 +31,21 @@ if __name__ == "__main__":
     traindataX = Dataset.ESIMDataSet(train_x)
     data_loaderX = data.DataLoader(
         traindataX,
-        batch_size=64,
+        batch_size=1,
         shuffle=False,
         collate_fn=Utilities.padd_sentence)
 
     traindataY = Dataset.ESIMDataSet(train_y)
     data_loaderY = data.DataLoader(
         train_y,
-        batch_size=64,
+        batch_size=1,
         shuffle=False,
         collate_fn=Utilities.padd_sentence)
     # build model
     model = Model.ESIM(len(word_to_idx) + 2, 1, 2, 1)
     criterion = nn.CrossEntropyLoss()
-    optimize = torch.optim.Adam(model.parameters(), lr=0.001)
-    for i in tqdm(range(100)):
+    optimize = torch.optim.Adam(model.parameters(), lr=0.0001)
+    for i in tqdm(range(1000)):
         iter1 = data.dataloader._DataLoaderIter(data_loaderX)
         iter2 = data.dataloader._DataLoaderIter(data_loaderY)
         for i in range(len(data_loaderX)):
@@ -58,5 +58,5 @@ if __name__ == "__main__":
             loss = criterion(p, target)
             loss.backward()
             optimize.step()
-    torch.save(model,'ESIMModel')
+    torch.save(model, 'ESIMModel')
     print(loss.data)
