@@ -4,6 +4,7 @@ import Utilities
 import Dataset
 import MLPClassifier
 import torch.nn.utils.rnn as rnn_utils
+import torch.nn.functional as F
 from torch.utils import data
 
 
@@ -23,7 +24,7 @@ class ESIM(nn.Module):
         self.composition = nn.LSTM(
             hidden_dim, hidden_dim, number_layers, batch_first=True)
         self.classifier = MLPClassifier.MLP(4*hidden_dim, 2)
-
+        self.dropout = torch.nn.Dropout(0.5)
     # init hidden layers
     def init_hidden(self, sentence):
         return (torch.randn(self.number_layers, sentence.shape[0],
@@ -40,6 +41,7 @@ class ESIM(nn.Module):
         sentence_encode, _ = self.lstm(sentence_embedding_packed, h)
         sentence_encode, out_len = rnn_utils.pad_packed_sequence(
             sentence_encode, batch_first=True)
+        sentence_encode = self.dropout(sentence_encode)
         return sentence_encode
 
     # get similarity matrix
@@ -85,11 +87,13 @@ class ESIM(nn.Module):
             sentence2_embedding * attented_sentence2
         ], dim=-1)
         # projection representaion
-        projection1 = self.line(enhance_embedding1)
-        projection2 = self.line(enhance_embedding2)
+        projection1 = F.relu(self.line(enhance_embedding1))
+        projection2 = F.relu(self.line(enhance_embedding2))
         # composition representaion
         composition1, _ = self.composition(projection1)
         composition2, _ = self.composition(projection2)
+        composition1 = self.dropout(composition1)
+        composition2 = self.dropout(composition2)
         # classifier
         if length1[0] >= length2[0]:
             mask1 = Utilities.get_mask(sentence1.shape[0], length1[0], length1)

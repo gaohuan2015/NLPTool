@@ -31,32 +31,35 @@ if __name__ == "__main__":
     traindataX = Dataset.ESIMDataSet(train_x)
     data_loaderX = data.DataLoader(
         traindataX,
-        batch_size=1,
+        batch_size=4,
         shuffle=False,
         collate_fn=Utilities.padd_sentence)
 
     traindataY = Dataset.ESIMDataSet(train_y)
     data_loaderY = data.DataLoader(
-        train_y,
-        batch_size=1,
+        traindataY,
+        batch_size=4,
         shuffle=False,
         collate_fn=Utilities.padd_sentence)
     # build model
-    model = Model.ESIM(len(word_to_idx) + 2, 1, 2, 1)
+    model = Model.ESIM(len(word_to_idx) + 2, 100, 64, 2)
     criterion = nn.CrossEntropyLoss()
     optimize = torch.optim.Adam(model.parameters(), lr=0.0001)
-    for i in tqdm(range(1000)):
+    for i in tqdm(range(300)):
+        running_loss = 0.0
         iter1 = data.dataloader._DataLoaderIter(data_loaderX)
         iter2 = data.dataloader._DataLoaderIter(data_loaderY)
         for i in range(len(data_loaderX)):
+            optimize.zero_grad()
             s1, l1 = iter1.next()
             s2, l2 = iter2.next()
             target = torch.tensor(
                 label[i*s1.shape[0]:i*s1.shape[0]+s1.shape[0]], dtype=torch.long)
-            model.zero_grad()
             p = model(s1, l1, s2, l2)
             loss = criterion(p, target)
             loss.backward()
             optimize.step()
+            running_loss += loss.item()
+        print(running_loss)
     torch.save(model, 'ESIMModel')
-    print(loss.data)
+    print('finished')
