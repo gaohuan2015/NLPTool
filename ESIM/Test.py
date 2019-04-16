@@ -15,15 +15,22 @@ if __name__ == "__main__":
     # test_sentence2 = 'What should I do to be a great geologist?'
     # t1.append(Utilities.prepare_sequence(test_sentence1, word_to_idx))
     # t2.append(Utilities.prepare_sequence(test_sentence2, word_to_idx))
-    csv_data = Utilities.read_csv('/NLPTool/ESIM/Data/train_test.csv')
-    label = Utilities.build_tag_from_csv(csv_data, 'is_duplicate')
-    for i in range(csv_data.shape[0]):
-        sentence = str(csv_data.loc[[i], 'question1'].iat[0])
-        t1.append(Utilities.prepare_sequence(sentence, word_to_idx))
+    # csv_data = Utilities.read_csv('/NLPTool/ESIM/Data/train_test.csv')
+    # label = Utilities.build_tag_from_csv(csv_data, 'is_duplicate')
+    # for i in range(csv_data.shape[0]):
+    #     sentence = str(csv_data.loc[[i], 'question1'].iat[0])
+    #     t1.append(Utilities.prepare_sequence(sentence, word_to_idx))
 
-    for i in range(csv_data.shape[0]):
-        sentence = str(csv_data.loc[[i], 'question2'].iat[0])
-        t2.append(Utilities.prepare_sequence(sentence, word_to_idx))
+    # for i in range(csv_data.shape[0]):
+    #     sentence = str(csv_data.loc[[i], 'question2'].iat[0])
+    #     t2.append(Utilities.prepare_sequence(sentence, word_to_idx))
+
+    s1, s2, label = Utilities.read_from_json(
+        '/NLPTool/ESIM/Data/test.json')
+    for s in s1:
+        t1.append(Utilities.prepare_sequence(s, word_to_idx))
+    for s in s2:
+        t2.append(Utilities.prepare_sequence(s, word_to_idx))
     # build data loader
     testdataX = Dataset.ESIMDataSet(t1)
     data_loaderX = data.DataLoader(
@@ -47,7 +54,7 @@ if __name__ == "__main__":
         s2, l2 = iter2.next()
         p = model(s1, l1, s2, l2)
         tag, idx = torch.max(p, dim=-1)
-        print(idx)
+        print('the {}th tag is {}'.format(i,idx))
         if label[i] == idx.data:
             correct = correct + 1
     print(correct/len(t1))

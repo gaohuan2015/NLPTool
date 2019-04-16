@@ -3,6 +3,23 @@ import os
 import numpy as np
 import pandas as pd
 import torch.nn.utils.rnn as rnn_utils
+import json_lines
+
+
+def read_from_json(path):
+    sentence1 = []
+    sentence2 = []
+    label = []
+    path = os.getcwd() + path
+    with open(path) as f:
+        for item in json_lines.reader(f):
+            sentence1.append(item['sentence1'])
+            sentence2.append(item['sentence1'])
+            if item['gold_label'] == 'contradiction':
+                label.append(0)
+            else:
+                label.append(1)
+    return sentence1, sentence2, label
 
 
 def padd_sentence(sentences):
@@ -26,6 +43,13 @@ def get_mask(batch_size, max_length, length):
     for b, i in enumerate(length):
         mask[b, i:] = 0
     return mask
+
+
+def build_dic(sentences, word_to_idx):
+    for s in sentences:
+        for w in s.split():
+            if w.lower() not in word_to_idx:
+                word_to_idx[w.lower()] = len(word_to_idx) + 1
 
 
 def build_dic_from_csv(data, columnhead, word_to_idx):
