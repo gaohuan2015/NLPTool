@@ -6,3 +6,6 @@ ESIM/Data/train_test.csv
 ESIM/Data/test.json
 Transformer/__pycache__/Utilities.cpython-37.pyc
 Transformer/__pycache__/MultiHeadAttention.cpython-37.pyc
+Transformer/__pycache__/EncoderLayer.cpython-37.pyc
+Transformer/__pycache__/PositionwiseFeedForward.cpython-37.pyc
+Transformer/__pycache__/SublayerConnection.cpython-37.pyc
