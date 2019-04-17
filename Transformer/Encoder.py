@@ -17,12 +17,3 @@ class Encoder(nn.Module):
             x = l(x)
         return self.norm(x)
 
-
-if __name__ == "__main__":
-    x = torch.randn(2, 3, 20)
-    attention_layer = MultiHeadAttention.MultiHeadAttention(2, 10)
-    forward_layer = PositionwiseFeedForward.PositionwiseFeedForward(20, 20)
-    el = EncoderLayer.EncoderLayer(x.size(), attention_layer, forward_layer)
-    ed = Encoder(x.size(), el, 6)
-    x = ed(x)
-    print(x.size())
