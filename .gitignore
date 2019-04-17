@@ -14,3 +14,6 @@ Transformer/__pycache__/DecoderLayer.cpython-37.pyc
 Transformer/__pycache__/Encoder.cpython-37.pyc
 Transformer/__pycache__/Transformer.cpython-37.pyc
 Transformer/__pycache__/Embedding.cpython-37.pyc
+Transformer/__pycache__/PositionEmbedding.cpython-37.pyc
+Transformer/__pycache__/BuildTransformer.cpython-37.pyc
+Transformer/__pycache__/EmbeddingLayer.cpython-37.pyc
