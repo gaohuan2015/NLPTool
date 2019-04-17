@@ -18,4 +18,5 @@ class DecoderLayer(nn.Module):
         x = self.en_att(x, e, e)
         x = self.sc[1](x, nn.Dropout(0.5))
         x = self.fw(x)
-        return sc[2](x, nn.Dropout(0.5))
+        x = self.sc[2](x, nn.Dropout(0.5))
+        return x

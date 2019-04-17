@@ -5,6 +5,7 @@ import torch.nn as nn
 
 class Decoder(nn.Module):
     def __init__(self, size, decoder_layer, layer_number):
+        super(Decoder, self).__init__()
         self.layers = Utilities.clone(decoder_layer, layer_number)
         self.norm = nn.LayerNorm(size)
 
