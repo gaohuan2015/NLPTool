@@ -12,3 +12,5 @@ Transformer/__pycache__/SublayerConnection.cpython-37.pyc
 Transformer/__pycache__/Decoder.cpython-37.pyc
 Transformer/__pycache__/DecoderLayer.cpython-37.pyc
 Transformer/__pycache__/Encoder.cpython-37.pyc
+Transformer/__pycache__/Transformer.cpython-37.pyc
+Transformer/__pycache__/Embedding.cpython-37.pyc
