@@ -1,42 +1,34 @@
 import torch
 import torch.nn as nn
-import MultiHeadAttention as multatt
-import PositionwiseFeedForward as pfw
-import PositionEmbedding as pe
-import EncoderLayer as ec
-import DecoderLayer as dc
 import copy
-import Encoder
-import Decoder
-import Transformer
-import Embedding
-import PositionEmbedding
-import EmbeddingLayer
-import Generator
+from Encoder import Encoder
+from Decoder import Decoder
+from Transformer import Transformer
+from Generator import Generator
+from PositionEmbedding import PositionEmbedding
+import MultiHeadAttention as MultiHeadAttention
+import PositionwiseFeedForward as PositionwiseFeedForward
+import EncoderLayer
+import DecoderLayer
+from Embedding import Embedding
 
 
-def BuildTransformer(scr_vocab_size, tg_vocabe_size, number_head, model_dim, embedding_dim, convert_dim, max_len):
-    attn = multatt.MultiHeadAttention(number_head, model_dim)
-    fw = pfw.PositionwiseFeedForward(embedding_dim, convert_dim)
-    src_word_embedding = Embedding.Embedding(scr_vocab_size, embedding_dim)
-    tag_word_embedding = Embedding.Embedding(tg_vocabe_size, embedding_dim)
-    position_embedding = PositionEmbedding.PositionEmbedding(
-        max_len, embedding_dim)
-    src_embedding_layer = EmbeddingLayer.EmbeddingLayer(
-        src_word_embedding, copy.deepcopy(position_embedding))
-    tg_embedding_layer = EmbeddingLayer.EmbeddingLayer(
-        tag_word_embedding, copy.deepcopy(position_embedding))
-    encoder_layer = ec.EncoderLayer(
-        copy.deepcopy(attn), copy.deepcopy(fw))
-    decoder_layer = dc.DecoderLayer(
-        copy.deepcopy(attn), copy.deepcopy(attn), copy.deepcopy(fw))
-    encoder = Encoder.Encoder(encoder_layer, 2)
-    decodeer = Decoder.Decoder(decoder_layer, 2)
-    generator = Generator.Generator(embedding_dim, tg_vocabe_size)
-    encoderdecoder = Transformer.Transformer(
-        src_embedding_layer, tg_embedding_layer, encoder, decodeer, generator)
-
-    for p in encoderdecoder.parameters():
+def make_model(src_vocab, tgt_vocab, N=6,
+               d_model=512, d_ff=2048, h=8, dropout=0.1):
+    c = copy.deepcopy
+    attn = MultiHeadAttention.MultiHeadAttention(h, d_model)
+    ff = PositionwiseFeedForward.PositionwiseFeedForward(
+        d_model, d_ff, dropout)
+    position = PositionEmbedding(d_model, dropout)
+    model = Transformer(
+        Encoder(EncoderLayer.EncoderLayer(
+            d_model, c(attn), c(ff), dropout), N),
+        Decoder(DecoderLayer.DecoderLayer(d_model, c(attn), c(attn),
+                                          c(ff), dropout), N),
+        nn.Sequential(Embedding(d_model, src_vocab), c(position)),
+        nn.Sequential(Embedding(d_model, tgt_vocab), c(position)),
+        Generator(d_model, tgt_vocab))
+    for p in model.parameters():
         if p.dim() > 1:
             nn.init.xavier_uniform(p)
-    return encoderdecoder
+    return model

@@ -1,15 +1,16 @@
 import torch
-import Utilities
 import torch.nn as nn
+import LayerNorm
+from Utilities import clone
 
 
 class Decoder(nn.Module):
-    def __init__(self, decoder_layer, layer_number):
+    def __init__(self, layer, N):
         super(Decoder, self).__init__()
-        self.layers = Utilities.clone(decoder_layer, layer_number)
+        self.layers = clone(layer, N)
+        self.norm = LayerNorm.LayerNorm(layer.size)
 
-    def forward(self, x, e):
-        self.norm = nn.LayerNorm(x.size())
-        for l in self.layers:
-            x = l(x, e)
+    def forward(self, x, memory, src_mask, tgt_mask):
+        for layer in self.layers:
+            x = layer(x, memory, src_mask, tgt_mask)
         return self.norm(x)

@@ -1,15 +1,14 @@
 import torch
 import copy
-import MultiHeadAttention
 import torch.nn as nn
+from LayerNorm import LayerNorm
 
 
 class SublayerConnection(nn.Module):
-    def __init__(self):
+    def __init__(self, size, dropout):
         super(SublayerConnection, self).__init__()
-        self.dropout = nn.Dropout(0.3)
+        self.norm = LayerNorm(size)
+        self.dropout = nn.Dropout(dropout)
 
-    def forward(self, x, Sublayer):
-        self.norm = nn.LayerNorm(x.size())
-        norm = self.norm(x)
-        return x+self.dropout(Sublayer(norm))
+    def forward(self, x, sublayer):
+        return x + self.dropout(sublayer(self.norm(x)))

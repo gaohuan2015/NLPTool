@@ -1,19 +1,16 @@
 import torch
-import Utilities
 import torch.nn as nn
 import EncoderLayer
-import MultiHeadAttention
-import PositionwiseFeedForward
-
+import LayerNorm 
+from Utilities import clone
 
 class Encoder(nn.Module):
-    def __init__(self, encoder_layer, layer_nmuber):
+    def __init__(self, layer, N):
         super(Encoder, self).__init__()
-        self.encoder_layers = Utilities.clone(encoder_layer, layer_nmuber)
+        self.layers = clone(layer, N)
+        self.norm = LayerNorm.LayerNorm(layer.size)
 
-    def forward(self, x):
-        self.norm = nn.LayerNorm(x.size())
-        for l in self.encoder_layers:
-            x = l(x)
+    def forward(self, x, mask):
+        for layer in self.layers:
+            x = layer(x, mask)
         return self.norm(x)
-

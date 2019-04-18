@@ -3,20 +3,20 @@ import torch.nn as nn
 
 
 class Transformer(nn.Module):
-    def __init__(self, embedding_layer1, embedding_layer2, encoder, decoder, generator):
+    def __init__(self, encoder, decoder, src_embed, tgt_embed, generator):
         super(Transformer, self).__init__()
         self.encoder = encoder
-        self.scr_embedding = embedding_layer1
-        self.tg_embedding = embedding_layer2
         self.decoder = decoder
+        self.src_embed = src_embed
+        self.tgt_embed = tgt_embed
         self.generator = generator
 
-    def forward(self, s):
-        x_embed = self.scr_embedding(s)
-        x_encoder = self.encoder(x_embed)
-        t = torch.zeros(s.size(), dtype=torch.long)
-        t[:, 1:] = s[:, 0:-1]
-        t_embed = self.tg_embedding(t)
-        target = self.decoder(t_embed, x_encoder)
-        target = self.generator(target)
-        return target
+    def forward(self, src, tgt, src_mask, tgt_mask):
+        return self.decode(self.encode(src, src_mask), src_mask,
+                           tgt, tgt_mask)
+
+    def encode(self, src, src_mask):
+        return self.encoder(self.src_embed(src), src_mask)
+
+    def decode(self, memory, src_mask, tgt, tgt_mask):
+        return self.decoder(self.tgt_embed(tgt), memory, src_mask, tgt_mask)
