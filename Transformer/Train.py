@@ -9,8 +9,8 @@ from tqdm import tqdm
 
 if __name__ == "__main__":
     # config
-    batch = 32
-    max_length = 10
+    batch = 16
+    max_length = 3
     # define model
     sentence1 = torch.randint(1, 3, (100, max_length))
     sentence2 = torch.randint(1, 4, (100, max_length))
@@ -25,7 +25,7 @@ if __name__ == "__main__":
             x = model(sentence[0], sentence[0], None, None)
             optimize.zero_grad()
             loss = criterion(
-                x.reshape(x.size(0)*x.size(1), x.size(-1)), sentence[1].reshape(sentence[1].size(-2)*sentence[1].size(-1)))
+                x.reshape(x.size(0)*x.size(1), x.size(-1)), sentence[0].reshape(sentence[0].size(-2)*sentence[0].size(-1)))
             loss.backward()
             optimize.step()
             total_loss += loss
@@ -34,5 +34,5 @@ if __name__ == "__main__":
     for i, sentence in enumerate(dataloader):
         x = model(sentence[0], sentence[0], None, None)
         v, index = torch.max(x, -1)
-        print(sentence[1])
+        print(sentence[0])
         print(index)
