@@ -1,22 +1,19 @@
 import torch
 import SublayerConnection as sc
-import Utilities
 import torch.nn as nn
-
+from Utilities import clone
 
 class DecoderLayer(nn.Module):
-    def __init__(self, attention_layer, en_attention_layer, forward_layer):
+    def __init__(self, size, self_attn, src_attn, feed_forward, dropout):
         super(DecoderLayer, self).__init__()
-        self.att = attention_layer
-        self.en_att = attention_layer
-        self.fw = forward_layer
-        self.sc = Utilities.clone(sc.SublayerConnection(), 3)
-
-    def forward(self, x, e):
-        x = self.att(x, x, x)
-        x = self.sc[0](x, nn.Dropout(0.3))
-        x = self.en_att(x, e, e)
-        x = self.sc[1](x, nn.Dropout(0.3))
-        x = self.fw(x)
-        x = self.sc[2](x, nn.Dropout(0.3))
-        return x
+        self.size = size
+        self.self_attn = self_attn
+        self.src_attn = src_attn
+        self.feed_forward = feed_forward
+        self.sublayer = clone(sc.SublayerConnection(size, dropout), 3)
+ 
+    def forward(self, x, memory, src_mask, tgt_mask):
+        m = memory
+        x = self.sublayer[0](x, lambda x: self.self_attn(x, x, x, tgt_mask))
+        x = self.sublayer[1](x, lambda x: self.src_attn(x, m, m, src_mask))
+        return self.sublayer[2](x, self.feed_forward)

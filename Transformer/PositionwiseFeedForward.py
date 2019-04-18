@@ -4,15 +4,11 @@ import torch.nn.functional as F
 
 
 class PositionwiseFeedForward(nn.Module):
-    def __init__(self, embedding_dim, convert_dim):
+    def __init__(self, d_model, d_ff, dropout=0.1):
         super(PositionwiseFeedForward, self).__init__()
-        self.line1 = nn.Linear(embedding_dim, convert_dim)
-        self.line2 = nn.Linear(convert_dim, embedding_dim)
-        self.dropout = nn.Dropout(0.3)
+        self.w_1 = nn.Linear(d_model, d_ff)
+        self.w_2 = nn.Linear(d_ff, d_model)
+        self.dropout = nn.Dropout(dropout)
 
     def forward(self, x):
-        x = self.line1(x)
-        x = F.relu(x)
-        x = self.dropout(x)
-        x = self.line2(x)
-        return x
+        return self.w_2(self.dropout(F.relu(self.w_1(x))))

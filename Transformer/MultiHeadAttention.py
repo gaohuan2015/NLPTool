@@ -2,30 +2,30 @@ import torch
 import math
 import torch.nn.functional as F
 import torch.nn as nn
-import Utilities
+from Utilities import attention
+from Utilities import clone
 
 
 class MultiHeadAttention(nn.Module):
-    def __init__(self, number_head, d_model):
+    def __init__(self, h, d_model, dropout=0.1):
         super(MultiHeadAttention, self).__init__()
-        self.h = number_head
-        self.dim = d_model
-        self.lines = Utilities.clone(
-            nn.Linear(d_model*number_head, d_model*number_head), 4)
+        assert d_model % h == 0
+        self.d_k = d_model // h
+        self.h = h
+        self.linears = clone(nn.Linear(d_model, d_model), 4)
+        self.attn = None
+        self.dropout = nn.Dropout(p=dropout)
 
-    def attention(self, query, key, value):
-        score = torch.matmul(query, key.transpose(-2, -1))
-        score = score / math.sqrt(self.dim)
-        score = F.softmax(score, dim=-1)
-        return torch.matmul(score, value)
+    def forward(self, query, key, value, mask=None):
+        if mask is not None:
+            mask = mask.unsqueeze(1)
+        nbatches = query.size(0)
+        query, key, value = \
+            [l(x).view(nbatches, -1, self.h, self.d_k).transpose(1, 2)
+             for l, x in zip(self.linears, (query, key, value))]
 
-    def forward(self, query, key, value):
-        batch_size = query.size(0)
-        Q, K, V = [layer(x)
-                   for layer, x in zip(self.lines, (query, key, value))]
-        Q, K, V = [x.view(batch_size, -1, self.h, self.dim).transpose(1, 2)
-                   for x in (Q, K, V)]
-        score = self.attention(Q, K, V)
-        score = score.transpose(1, 2).contiguous().view(batch_size, -1, self.h*self.dim)
-        return self.lines[-1](score)
-
+        x, self.attn = attention(query, key, value, mask=mask,
+                                 dropout=self.dropout)
+        x = x.transpose(1, 2).contiguous() \
+             .view(nbatches, -1, self.h * self.d_k)
+        return self.linears[-1](x)
