@@ -2,8 +2,7 @@
 
 进度：
 
-Transformer完成了基本框架，还需要完成训练，句子的pad以及测试和测度的输出
-
+Transformer完成了基本框架，训练已经完成，需要测试mask的效果
 后续实现算法参考以下论文：
 
 https://arxiv.org/pdf/1705.00108.pdf
