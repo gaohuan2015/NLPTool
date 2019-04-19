@@ -14,12 +14,13 @@ class LanguageModel(nn.Module):
         self.layer_num = layer_num
         self.hidden_dim = hidden_dim
         self.embed = nn.Embedding(vocab_size, embed_dim)
-        self.lstm = nn.LSTM(embed_dim, hidden_dim, layer_num, batch_first=True)
+        self.lstm = nn.LSTM(embed_dim, hidden_dim//2, layer_num,
+                            batch_first=True, bidirectional=True)
         self.line = nn.Linear(hidden_dim, vocab_size)
 
     def init_weight(self, data):
-        return (torch.randn(self.layer_num, data.shape[0], self.hidden_dim),
-                torch.randn(self.layer_num, data.shape[0], self.hidden_dim))
+        return (torch.randn(self.layer_num*2, data.shape[0], self.hidden_dim // 2),
+                torch.randn(self.layer_num*2, data.shape[0], self.hidden_dim // 2))
 
     def forward(self, x, length):
         h = self.init_weight(x)
@@ -35,13 +36,14 @@ class LanguageModel(nn.Module):
 
 
 if __name__ == "__main__":
-    batch = 2
+    batch = 8
     word_2_idx = {'bos': 0, 'eos': 1}
     # read data
     sentences_to_id = []
     sentence = read_file('/NLPTool/SemiSequenceTag/Data/corpus')
     build_voc_size(sentence, word_2_idx)
     for s in sentence:
+        s = 'bos '+s.strip('\n')+' eos'
         sentences_to_id.append(prepare_sequence(s, word_2_idx))
     training_data = UnlabelData(sentences_to_id)
     dataloader = data.DataLoader(
@@ -49,10 +51,11 @@ if __name__ == "__main__":
     # build model
     model = LanguageModel(len(word_2_idx)+3, 100, 50, 2)
     c = nn.NLLLoss()
-    p = torch.optim.Adam(model.parameters(), 0.01)
+    p = torch.optim.Adam(model.parameters(), 0.001)
     x = []
     y = []
-    for i in tqdm(range(100)):
+    for i in tqdm(range(200)):
+        total_loss = 0
         for data, length in dataloader:
             p.zero_grad()
             train = data[:, 0:data.size(-1)-1]
@@ -60,13 +63,12 @@ if __name__ == "__main__":
             predict = model(train, length).reshape(
                 train.size(0)*train.size(1), -1)
             loss = c(predict, target)
+            total_loss = total_loss + loss
             loss.backward()
             p.step()
-            x.append(i)
-            y.append(loss)
-    
-    plt.figure()
-    plt.plot(x, y)
+        x.append(i)
+        y.append(total_loss)
+    plt.plot(x, y, 'ro-')
     plt.title('loss function')
     plt.xlabel('iteration')
     plt.ylabel('loss')

@@ -6,8 +6,9 @@ import torch.nn.utils.rnn as rnn_utils
 def padd_sentence(sentences):
     sentences.sort(key=lambda x: len(x), reverse=True)
     sentences_length = [len(x) for x in sentences]
+    max_length = sentences_length[0]
     for i in range(len(sentences_length)):
-        if sentences_length[i] == sentences_length[0]:
+        if sentences_length[i] == max_length:
             sentences_length[i] = sentences_length[i]-1
     sentences = rnn_utils.pad_sequence(
         sentences, batch_first=True, padding_value=0)
@@ -22,7 +23,6 @@ def build_voc_size(sentences, word_2_idx):
 
 
 def prepare_sequence(seq, to_ix):
-    seq = 'bos '+seq.strip('\n')+' eos'
     idxs = [torch.tensor(to_ix[w.lower()], dtype=torch.long)
             for w in seq.split()]
     return torch.tensor(idxs, dtype=torch.long)
