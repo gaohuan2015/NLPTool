@@ -15,6 +15,14 @@ def padd_sentence(sentences):
     return sentences, sentences_length
 
 
+def padd_sentence_crf(sentences):
+    sentences.sort(key=lambda x: len(x), reverse=True)
+    sentences_length = [len(x) for x in sentences]
+    sentences = rnn_utils.pad_sequence(
+        sentences, batch_first=True, padding_value=0)
+    return sentences, sentences_length
+
+
 def build_voc_size(sentences, word_2_idx):
     for sentence in sentences:
         for w in sentence.split():
