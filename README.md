@@ -7,6 +7,8 @@ ESIM还存在一些Bug，再测试时发现分类器会倾向分类到不相似�
 Transformer完成了基本框架，训练已经完成，需要测试mask的效果
 后续实现算法参考以下论文：
 
+完成了semi-supervised sequence tag的unlabel数据部分
+
 https://arxiv.org/pdf/1705.00108.pdf
 
 https://arxiv.org/pdf/1901.11504.pdf
