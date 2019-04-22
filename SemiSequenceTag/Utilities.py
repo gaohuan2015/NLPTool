@@ -6,12 +6,27 @@ import torch.nn.utils.rnn as rnn_utils
 def padd_sentence(sentences):
     sentences.sort(key=lambda x: len(x), reverse=True)
     sentences_length = [len(x) for x in sentences]
+    max_length = sentences_length[0]
     for i in range(len(sentences_length)):
-        if sentences_length[i] == sentences_length[0]:
-            sentences_length[i] = sentences_length[i]-1
+        if sentences_length[i] == max_length:
+            sentences_length[i] = sentences_length[i] - 1
     sentences = rnn_utils.pad_sequence(
         sentences, batch_first=True, padding_value=0)
     return sentences, sentences_length
+
+
+def padd_sentence_crf(SequenceTag):
+    sentences = []
+    tags = []
+    for s, t in SequenceTag:
+        sentences.append(s)
+        tags.append(t)
+    sentences.sort(key=lambda x: len(x), reverse=True)
+    sentences_length = [len(x) for x in sentences]
+    sentences = rnn_utils.pad_sequence(
+        sentences, batch_first=True, padding_value=0)
+    tags = rnn_utils.pad_sequence(tags, batch_first=True, padding_value=4)
+    return sentences, tags, sentences_length
 
 
 def build_voc_size(sentences, word_2_idx):
@@ -22,9 +37,9 @@ def build_voc_size(sentences, word_2_idx):
 
 
 def prepare_sequence(seq, to_ix):
-    seq = 'bos '+seq.strip('\n')+' eos'
-    idxs = [torch.tensor(to_ix[w.lower()], dtype=torch.long)
-            for w in seq.split()]
+    idxs = [
+        torch.tensor(to_ix[w.lower()], dtype=torch.long) for w in seq.split()
+    ]
     return torch.tensor(idxs, dtype=torch.long)
 
 
