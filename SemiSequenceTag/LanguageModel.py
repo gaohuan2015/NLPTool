@@ -43,7 +43,7 @@ class LanguageModel(nn.Module):
 
 
 if __name__ == "__main__":
-    batch = 32
+    batch = 60
     word_2_idx = {'bos': 0, 'eos': 1}
     # read data
     sentences_to_id = []
@@ -69,8 +69,8 @@ if __name__ == "__main__":
         total_loss = 0
         for data, length in dataloader:
             p.zero_grad()
-            train = data[:, 0:data.size(-1) - 1]
-            target = data[:, 1:data.size(-1)].reshape(-1)
+            train = data[:, 0:data.size(-1) - 1].to(device)
+            target = data[:, 1:data.size(-1)].reshape(-1).to(device)
             predict = model(train,
                             length).reshape(train.size(0) * train.size(1), -1)
             loss = c(predict, target)
