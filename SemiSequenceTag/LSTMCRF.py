@@ -3,6 +3,9 @@ import torch.nn as nn
 import torch.nn.utils.rnn as rnn_utils
 from UnlabelData import *
 from Utilities import *
+from SequenceTag import *
+from tqdm import *
+import matplotlib.pyplot as plt
 
 
 class LSTMCRF(nn.Module):
@@ -23,8 +26,9 @@ class LSTMCRF(nn.Module):
             batch_first=True,
             bidirectional=True)
         self.hid2tag = nn.Linear(hidden_size, self.tag_size)
+        device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         self.transition = nn.Parameter(
-            torch.randn(self.tag_size, self.tag_size))
+            torch.randn(self.tag_size, self.tag_size)).to(device)
         self.transition[tag_to_idx[self.start_tag], :] = -10000
         self.transition[:, tag_to_idx[self.end_tag]] = -10000
 
@@ -52,6 +56,28 @@ class LSTMCRF(nn.Module):
         return max_value + torch.log(
             torch.sum(torch.exp(vec - max_value_broadcast)))
 
+    def sentence_score(self, feature, tags):
+        device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+        batch_size = feature.size(0)
+        score = torch.zeros(batch_size, 1).to(device)
+        start_tags = torch.tensor([self.tag_to_idx[self.start_tag]],
+                                  dtype=torch.long).to(device).view(1).expand(
+                                      batch_size, 1)
+        tags = torch.cat([start_tags, tags], dim=1)
+        for i, feat in enumerate(feature.permute(1, 0, 2)):
+            score = score + self.transition[
+                tags[:, i + 1], tags[:, i]] + feat[:, tags[:, i + 1]][:, 0]
+
+        score = score + self.transition[tags[:, self.tag_to_idx[self.end_tag]],
+                                        tags[:, -1]]
+        return score[0]
+
+    def neg_log_likehood(self, sentence, tags, length):
+        feature = self.lstm_feature(sentence, length)
+        forward_score = self.forward_inference(feature)
+        sentence_score = self.sentence_score(feature, tags)
+        return torch.sum(forward_score - sentence_score) / sentence.size(0)
+
     def forward_inference(self, lstm_feature):
         device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         batch_size = lstm_feature.size(0)
@@ -67,8 +93,13 @@ class LSTMCRF(nn.Module):
                 transition_score = self.transition[next_tag].view(
                     1, -1).expand(batch_size, self.tag_size)
                 next_tag_var = forward_var + emition_scoare + transition_score
-                alphas.append(self.log_exp_sum(next_tag_var))
-            
+                alphas.append(
+                    self.log_exp_sum(next_tag_var).view(batch_size, -1))
+            forward_var = torch.cat(alphas, 1).view(batch_size, -1)
+        terminal_var = forward_var + self.transition[self.tag_to_idx[
+            self.end_tag]]
+        alphas = self.log_exp_sum(terminal_var)
+        return alphas
 
     def forward(self, x, len):
         lstm = self.lstm_feature(x, len)
@@ -77,29 +108,55 @@ class LSTMCRF(nn.Module):
 
 
 if __name__ == "__main__":
+    batchsize = 2
     word_2_idx = {}
     tag_to_ix = {"b": 0, "i": 1, "o": 2, "<start>": 3, "<stop>": 4}
     # read data
     training_data = [
         "the wall street journal reported today that apple corporation made money",
-        "georgia tech is a university in georgia"
+        "georgia tech is a university in georgia",
+        'Jean Pierre lives in New York',
+        #'The European Union is a political and economic union',
+        #'A French American actor won an oscar'
     ]
-    tag_data = ["B I I I O O O B I O O", "B I O O O O B"]
+    tag_data = [
+        "B I I I O O O B I O O",
+        "B I O O O O B",   "B I O O B I",
+        #"O B I O O O O O O", "O B I O O O O"
+    ]
     sentences_to_id = []
     tag_to_id = []
     build_voc_size(training_data, word_2_idx)
     for s, t in zip(training_data, tag_data):
         sentences_to_id.append(prepare_sequence(s, word_2_idx))
         tag_to_id.append(prepare_sequence(t, tag_to_ix))
-    training = UnlabelData(sentences_to_id)
+    training = SequenceTag(sentences_to_id, tag_to_id)
     dataloader = data.DataLoader(
         training,
-        batch_size=2,
+        batch_size=batchsize,
         shuffle=False,
         num_workers=4,
         collate_fn=padd_sentence_crf)
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     model = LSTMCRF(len(word_2_idx) + 1, 100, 50, 2, tag_to_ix).to(device)
-    for s, l in dataloader:
-        l = torch.tensor(l, dtype=torch.long)
-        print(model(s.to(device), l.to(device)))
+    optimizer = torch.optim.Adam(model.parameters(), lr=0.01)
+    x = []
+    y = []
+    for epoch in tqdm(range(50)):
+        total_loss = 0
+        for s, t, l in dataloader:
+            model.zero_grad()
+            l = torch.tensor(l, dtype=torch.long)
+            loss = model.neg_log_likehood(
+                s.to(device), t.to(device), l.to(device))
+            loss.backward(retain_graph=True)
+            optimizer.step()
+            total_loss = total_loss + loss
+        x.append(epoch)
+        y.append(total_loss)
+    plt.plot(x, y, 'ro-')
+    plt.title('loss function')
+    plt.xlabel('iteration')
+    plt.ylabel('loss')
+    plt.legend()
+    plt.show()
