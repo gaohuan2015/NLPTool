@@ -3,6 +3,7 @@ import torch.nn as nn
 import torch.nn.utils.rnn as rnn_utils
 from UnlabelData import *
 from Utilities import *
+from SequenceTag import *
 
 
 class LSTMCRF(nn.Module):
@@ -52,6 +53,28 @@ class LSTMCRF(nn.Module):
         return max_value + torch.log(
             torch.sum(torch.exp(vec - max_value_broadcast)))
 
+    def sentence_score(self, feature, tags):
+        device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+        batch_size = feature.size(0)
+        score = torch.zeros(batch_size, 1).to(device)
+        start_tags = torch.tensor([self.tag_to_idx[self.start_tag]],
+                                  dtype=torch.long).to(device).view(1).expand(
+                                      batch_size, 1)
+        tags = torch.cat([start_tags, tags], dim=1)
+        for i, feat in enumerate(feature.permute(1, 0, 2)):
+            score = score + self.transition[
+                tags[:, i + 1], tags[:, i]] + feat[:, tags[:, i + 1]][:, 0]
+
+        score = score + self.transition[tags[:, self.tag_to_idx[self.end_tag]],
+                                        tags[:, -1]]
+        return score[0]
+
+    def neg_log_likehood(self, sentence, tags, length):
+        feature = self.lstm_feature(sentence, length)
+        forward_score = self.forward_inference(feature)
+        sentence_score = self.sentence_score(feature, tags)
+        return forward_score - sentence_score
+
     def forward_inference(self, lstm_feature):
         device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         batch_size = lstm_feature.size(0)
@@ -67,8 +90,13 @@ class LSTMCRF(nn.Module):
                 transition_score = self.transition[next_tag].view(
                     1, -1).expand(batch_size, self.tag_size)
                 next_tag_var = forward_var + emition_scoare + transition_score
-                alphas.append(self.log_exp_sum(next_tag_var))
-            
+                alphas.append(
+                    self.log_exp_sum(next_tag_var).view(batch_size, -1))
+            forward_var = torch.cat(alphas, 1).view(batch_size, -1)
+        terminal_var = forward_var + self.transition[self.tag_to_idx[
+            self.end_tag]]
+        alphas = self.log_exp_sum(terminal_var)
+        return alphas
 
     def forward(self, x, len):
         lstm = self.lstm_feature(x, len)
@@ -77,6 +105,7 @@ class LSTMCRF(nn.Module):
 
 
 if __name__ == "__main__":
+    batchsize = 2
     word_2_idx = {}
     tag_to_ix = {"b": 0, "i": 1, "o": 2, "<start>": 3, "<stop>": 4}
     # read data
@@ -91,15 +120,17 @@ if __name__ == "__main__":
     for s, t in zip(training_data, tag_data):
         sentences_to_id.append(prepare_sequence(s, word_2_idx))
         tag_to_id.append(prepare_sequence(t, tag_to_ix))
-    training = UnlabelData(sentences_to_id)
+    training = SequenceTag(sentences_to_id, tag_to_id)
     dataloader = data.DataLoader(
         training,
-        batch_size=2,
+        batch_size=batchsize,
         shuffle=False,
         num_workers=4,
         collate_fn=padd_sentence_crf)
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     model = LSTMCRF(len(word_2_idx) + 1, 100, 50, 2, tag_to_ix).to(device)
-    for s, l in dataloader:
+    batch_index = 0
+    for s, t, l in dataloader:
         l = torch.tensor(l, dtype=torch.long)
+        model.neg_log_likehood(s.to(device), t.to(device), l.to(device))
         print(model(s.to(device), l.to(device)))
