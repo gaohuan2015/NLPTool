@@ -68,6 +68,7 @@ class LSTMCRF(nn.Module):
                     1, -1).expand(batch_size, self.tag_size)
                 next_tag_var = forward_var + emition_scoare + transition_score
                 alphas.append(self.log_exp_sum(next_tag_var))
+            
 
     def forward(self, x, len):
         lstm = self.lstm_feature(x, len)
