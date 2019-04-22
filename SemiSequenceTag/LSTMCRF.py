@@ -4,6 +4,8 @@ import torch.nn.utils.rnn as rnn_utils
 from UnlabelData import *
 from Utilities import *
 from SequenceTag import *
+from tqdm import *
+import matplotlib.pyplot as plt
 
 
 class LSTMCRF(nn.Module):
@@ -24,8 +26,9 @@ class LSTMCRF(nn.Module):
             batch_first=True,
             bidirectional=True)
         self.hid2tag = nn.Linear(hidden_size, self.tag_size)
+        device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         self.transition = nn.Parameter(
-            torch.randn(self.tag_size, self.tag_size))
+            torch.randn(self.tag_size, self.tag_size)).to(device)
         self.transition[tag_to_idx[self.start_tag], :] = -10000
         self.transition[:, tag_to_idx[self.end_tag]] = -10000
 
@@ -73,7 +76,7 @@ class LSTMCRF(nn.Module):
         feature = self.lstm_feature(sentence, length)
         forward_score = self.forward_inference(feature)
         sentence_score = self.sentence_score(feature, tags)
-        return forward_score - sentence_score
+        return torch.sum(forward_score - sentence_score) / sentence.size(0)
 
     def forward_inference(self, lstm_feature):
         device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -111,9 +114,16 @@ if __name__ == "__main__":
     # read data
     training_data = [
         "the wall street journal reported today that apple corporation made money",
-        "georgia tech is a university in georgia"
+        "georgia tech is a university in georgia",
+        'Jean Pierre lives in New York',
+        #'The European Union is a political and economic union',
+        #'A French American actor won an oscar'
     ]
-    tag_data = ["B I I I O O O B I O O", "B I O O O O B"]
+    tag_data = [
+        "B I I I O O O B I O O",
+        "B I O O O O B",   "B I O O B I",
+        #"O B I O O O O O O", "O B I O O O O"
+    ]
     sentences_to_id = []
     tag_to_id = []
     build_voc_size(training_data, word_2_idx)
@@ -129,8 +139,24 @@ if __name__ == "__main__":
         collate_fn=padd_sentence_crf)
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     model = LSTMCRF(len(word_2_idx) + 1, 100, 50, 2, tag_to_ix).to(device)
-    batch_index = 0
-    for s, t, l in dataloader:
-        l = torch.tensor(l, dtype=torch.long)
-        model.neg_log_likehood(s.to(device), t.to(device), l.to(device))
-        print(model(s.to(device), l.to(device)))
+    optimizer = torch.optim.Adam(model.parameters(), lr=0.01)
+    x = []
+    y = []
+    for epoch in tqdm(range(50)):
+        total_loss = 0
+        for s, t, l in dataloader:
+            model.zero_grad()
+            l = torch.tensor(l, dtype=torch.long)
+            loss = model.neg_log_likehood(
+                s.to(device), t.to(device), l.to(device))
+            loss.backward(retain_graph=True)
+            optimizer.step()
+            total_loss = total_loss + loss
+        x.append(epoch)
+        y.append(total_loss)
+    plt.plot(x, y, 'ro-')
+    plt.title('loss function')
+    plt.xlabel('iteration')
+    plt.ylabel('loss')
+    plt.legend()
+    plt.show()
