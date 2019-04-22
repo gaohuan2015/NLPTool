@@ -33,7 +33,6 @@ class LSTMCRF(nn.Module):
         self.transition[tag_to_idx[self.start_tag], :] = -10000
         self.transition[:, tag_to_idx[self.end_tag]] = -10000
         self.transition[tag_to_idx[self.pad_tag], :] = 0
-        self.transition[:, tag_to_idx[self.pad_tag]] = 0
 
     def init_weight(self, data):
         device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -142,7 +141,7 @@ if __name__ == "__main__":
                                  collate_fn=padd_sentence_crf)
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     model = LSTMCRF(len(word_2_idx) + 1, 100, 50, 2, tag_to_ix).to(device)
-    optimizer = torch.optim.SGD(model.parameters(), lr=0.01)
+    optimizer = torch.optim.Adam(model.parameters(), lr=0.01)
     x = []
     y = []
     for epoch in tqdm(range(50)):
