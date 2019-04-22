@@ -22,10 +22,11 @@ class LanguageModel(nn.Module):
         self.line = nn.Linear(hidden_dim, vocab_size)
 
     def init_weight(self, data):
+        device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         return (torch.randn(self.layer_num * 2, data.shape[0],
-                            self.hidden_dim // 2),
+                            self.hidden_dim // 2).to(device),
                 torch.randn(self.layer_num * 2, data.shape[0],
-                            self.hidden_dim // 2))
+                            self.hidden_dim // 2).to(device))
 
     def forward(self, x, length):
         h = self.init_weight(x)
@@ -42,11 +43,11 @@ class LanguageModel(nn.Module):
 
 
 if __name__ == "__main__":
-    batch = 8
+    batch = 32
     word_2_idx = {'bos': 0, 'eos': 1}
     # read data
     sentences_to_id = []
-    sentence = read_file('/NLPTool/SemiSequenceTag/Data/corpus')
+    sentence = read_file('/SemiSequenceTag/Data/corpus')
     build_voc_size(sentence, word_2_idx)
     for s in sentence:
         s = 'bos ' + s.strip('\n') + ' eos'
@@ -58,7 +59,8 @@ if __name__ == "__main__":
                                  num_workers=4,
                                  collate_fn=padd_sentence)
     # build model
-    model = LanguageModel(len(word_2_idx) + 3, 100, 50, 2)
+    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    model = LanguageModel(len(word_2_idx) + 3, 100, 50, 2).to(device)
     c = nn.NLLLoss()
     p = torch.optim.Adam(model.parameters(), 0.001)
     x = []
