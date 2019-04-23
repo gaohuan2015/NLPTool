@@ -10,8 +10,9 @@ def padd_sentence(sentences):
     for i in range(len(sentences_length)):
         if sentences_length[i] == max_length:
             sentences_length[i] = sentences_length[i] - 1
-    sentences = rnn_utils.pad_sequence(
-        sentences, batch_first=True, padding_value=0)
+    sentences = rnn_utils.pad_sequence(sentences,
+                                       batch_first=True,
+                                       padding_value=0)
     return sentences, sentences_length
 
 

@@ -6,6 +6,7 @@ from Utilities import *
 from SequenceTag import *
 from tqdm import *
 import matplotlib.pyplot as plt
+import torch.autograd as autograd
 
 
 class LSTMCRF(nn.Module):
@@ -20,12 +21,11 @@ class LSTMCRF(nn.Module):
         self.tag_to_idx = tag_to_idx
         self.tag_size = len(tag_to_idx)
         self.embedding_layer = nn.Embedding(vocab_size, embedding_size)
-        self.lstm = nn.LSTM(
-            embedding_size,
-            hidden_size // 2,
-            layer_number,
-            batch_first=True,
-            bidirectional=True)
+        self.lstm = nn.LSTM(embedding_size,
+                            hidden_size // 2,
+                            layer_number,
+                            batch_first=True,
+                            bidirectional=True)
         self.hid2tag = nn.Linear(hidden_size, self.tag_size)
         device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         self.transition = nn.Parameter(
@@ -34,7 +34,7 @@ class LSTMCRF(nn.Module):
         self.transition[:, tag_to_idx[self.end_tag]] = -10000
         self.transition[tag_to_idx[self.pad_tag], :] = 0
         self.transition[:, tag_to_idx[self.pad_tag]] = 0
-
+        
     def init_weight(self, data):
         device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         return (torch.randn(self.layer_num * 2, data.shape[0],
@@ -45,8 +45,9 @@ class LSTMCRF(nn.Module):
     def lstm_feature(self, x, length):
         h = self.init_weight(x)
         embed = self.embedding_layer(x)
-        packed_embedding = rnn_utils.pack_padded_sequence(
-            embed, length, batch_first=True)
+        packed_embedding = rnn_utils.pack_padded_sequence(embed,
+                                                          length,
+                                                          batch_first=True)
         out, _ = self.lstm(packed_embedding, h)
         out, _ = rnn_utils.pad_packed_sequence(out, batch_first=True)
         tag_score = self.hid2tag(out)
@@ -88,10 +89,11 @@ class LSTMCRF(nn.Module):
     def forward_inference(self, lstm_feature):
         device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         batch_size = lstm_feature.size(0)
-        init_alphas = torch.full((batch_size, self.tag_size),
-                                 -10000).to(device)
+        init_alphas = torch.full((batch_size, self.tag_size), -10000)
         init_alphas[:, self.tag_to_idx[self.start_tag]] = 0
-        forward_var = init_alphas
+        forward_var = autograd.Variable(init_alphas)
+        forward_var = forward_var.to(device)
+
         for feature in lstm_feature.permute(1, 0, 2):
             alphas = []
             for next_tag in range(self.tag_size):
@@ -141,6 +143,7 @@ class LSTMCRF(nn.Module):
         best_path.reverse()
         return path_score, best_path
 
+
     def forward(self, x, len):
         lstm = self.lstm_feature(x, len)
         score, tag = self.viterbi_decode(lstm)
@@ -170,12 +173,11 @@ if __name__ == "__main__":
         sentences_to_id.append(prepare_sequence(s, word_2_idx))
         tag_to_id.append(prepare_sequence(t, tag_to_ix))
     training = SequenceTag(sentences_to_id, tag_to_id)
-    dataloader = data.DataLoader(
-        training,
-        batch_size=batchsize,
-        shuffle=False,
-        num_workers=4,
-        collate_fn=padd_sentence_crf)
+    dataloader = data.DataLoader(training,
+                                 batch_size=batchsize,
+                                 shuffle=False,
+                                 num_workers=4,
+                                 collate_fn=padd_sentence_crf)
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     model = LSTMCRF(len(word_2_idx) + 1, 100, 50, 2, tag_to_ix).to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=0.01)
@@ -186,8 +188,8 @@ if __name__ == "__main__":
         for s, t, l in dataloader:
             model.zero_grad()
             l = torch.tensor(l, dtype=torch.long)
-            loss = model.neg_log_likehood(
-                s.to(device), t.to(device), l.to(device))
+            loss = model.neg_log_likehood(s.to(device), t.to(device),
+                                          l.to(device))
             loss.backward(retain_graph=True)
             optimizer.step()
             total_loss = total_loss + loss
