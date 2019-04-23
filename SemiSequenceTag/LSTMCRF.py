@@ -104,6 +104,7 @@ class LSTMCRF(nn.Module):
         return alphas
 
     def viterbi_decode(self, feature):
+        backpo
         return feature
 
     def forward(self, x, len):
