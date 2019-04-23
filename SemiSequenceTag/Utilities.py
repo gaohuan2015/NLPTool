@@ -25,7 +25,7 @@ def padd_sentence_crf(SequenceTag):
     sentences_length = [len(x) for x in sentences]
     sentences = rnn_utils.pad_sequence(
         sentences, batch_first=True, padding_value=0)
-    tags = rnn_utils.pad_sequence(tags, batch_first=True, padding_value=4)
+    tags = rnn_utils.pad_sequence(tags, batch_first=True, padding_value=5)
     return sentences, tags, sentences_length
 
 

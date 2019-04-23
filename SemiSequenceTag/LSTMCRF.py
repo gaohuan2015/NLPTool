@@ -15,6 +15,7 @@ class LSTMCRF(nn.Module):
         self.layer_num = layer_number
         self.start_tag = '<start>'
         self.end_tag = '<stop>'
+        self.pad_tag = '<pad>'
         self.hidden_dim = hidden_size
         self.tag_to_idx = tag_to_idx
         self.tag_size = len(tag_to_idx)
@@ -31,6 +32,8 @@ class LSTMCRF(nn.Module):
             torch.randn(self.tag_size, self.tag_size)).to(device)
         self.transition[tag_to_idx[self.start_tag], :] = -10000
         self.transition[:, tag_to_idx[self.end_tag]] = -10000
+        self.transition[tag_to_idx[self.pad_tag], :] = 0
+        self.transition[:, tag_to_idx[self.pad_tag]] = 0
 
     def init_weight(self, data):
         device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -67,7 +70,6 @@ class LSTMCRF(nn.Module):
         for i, feat in enumerate(feature.permute(1, 0, 2)):
             score = score + self.transition[
                 tags[:, i + 1], tags[:, i]] + feat[:, tags[:, i + 1]][:, 0]
-
         score = score + self.transition[tags[:, self.tag_to_idx[self.end_tag]],
                                         tags[:, -1]]
         return score[0]
@@ -76,7 +78,7 @@ class LSTMCRF(nn.Module):
         feature = self.lstm_feature(sentence, length)
         forward_score = self.forward_inference(feature)
         sentence_score = self.sentence_score(feature, tags)
-        return torch.sum(forward_score - sentence_score) / sentence.size(0)
+        return torch.mean(forward_score - sentence_score)
 
     def forward_inference(self, lstm_feature):
         device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -101,6 +103,9 @@ class LSTMCRF(nn.Module):
         alphas = self.log_exp_sum(terminal_var)
         return alphas
 
+    def viterbi_decode(self, feature):
+        return feature
+
     def forward(self, x, len):
         lstm = self.lstm_feature(x, len)
         forward_score = self.forward_inference(lstm)
@@ -108,21 +113,20 @@ class LSTMCRF(nn.Module):
 
 
 if __name__ == "__main__":
-    batchsize = 2
+    batchsize = 5
     word_2_idx = {}
-    tag_to_ix = {"b": 0, "i": 1, "o": 2, "<start>": 3, "<stop>": 4}
+    tag_to_ix = {"b": 0, "i": 1, "o": 2, "<start>": 3, "<stop>": 4, "<pad>": 5}
     # read data
     training_data = [
         "the wall street journal reported today that apple corporation made money",
         "georgia tech is a university in georgia",
         'Jean Pierre lives in New York',
-        #'The European Union is a political and economic union',
-        #'A French American actor won an oscar'
+        'The European Union is a political and economic union',
+        'A French American actor won an oscar'
     ]
     tag_data = [
-        "B I I I O O O B I O O",
-        "B I O O O O B",   "B I O O B I",
-        #"O B I O O O O O O", "O B I O O O O"
+        "B I I I O O O B I O O", "B I O O O O B", "B I O O B I",
+        "O B I O O O O O O", "O B I O O O O"
     ]
     sentences_to_id = []
     tag_to_id = []
