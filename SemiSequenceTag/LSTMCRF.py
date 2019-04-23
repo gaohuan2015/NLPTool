@@ -103,18 +103,46 @@ class LSTMCRF(nn.Module):
         alphas = self.log_exp_sum(terminal_var)
         return alphas
 
-    def viterbi_decode(self, feature):
-        backpo
-        return feature
+    def viterbi_decode(self, feats):
+        device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+        batch_size = feats.size(0)
+        backpointers = []
+        init_vvars = torch.full((1, self.tag_size), -10000.)
+        init_vvars[0][self.tag_to_idx[self.start_tag]] = 0
+        forward_var = init_vvars.to(device)
+        for feat in feats.permute(1, 0, 2):
+            bptrs_t = []
+            viterbivars_t = []
+
+            for next_tag in range(self.tag_size):
+                next_tag_var = forward_var + self.transition[next_tag]
+                _, best_tag_id = torch.max(next_tag_var, -1)
+                bptrs_t.append(best_tag_id)
+                viterbivars_t.append(next_tag_var[0][best_tag_id].view(1))
+            forward_var = (torch.cat(viterbivars_t) + feat).view(1, -1)
+            backpointers.append(bptrs_t)
+        terminal_var = forward_var + self.transition[self.tag_to_idx[
+            self.end_tag]]
+        _, best_tag_id = torch.max(terminal_var, -1)
+        path_score = terminal_var[0][best_tag_id]
+
+        best_path = [best_tag_id]
+        for bptrs_t in reversed(backpointers):
+            best_tag_id = bptrs_t[best_tag_id]
+            best_path.append(best_tag_id)
+        start = best_path.pop()
+        assert start == self.tag_to_idx[self.start_tag]
+        best_path.reverse()
+        return path_score, best_path
 
     def forward(self, x, len):
         lstm = self.lstm_feature(x, len)
-        forward_score = self.forward_inference(lstm)
-        return lstm
+        score, tag = self.viterbi_decode(lstm)
+        return score, tag
 
 
 if __name__ == "__main__":
-    batchsize = 5
+    batchsize = 1
     word_2_idx = {}
     tag_to_ix = {"b": 0, "i": 1, "o": 2, "<start>": 3, "<stop>": 4, "<pad>": 5}
     # read data
@@ -143,25 +171,38 @@ if __name__ == "__main__":
         num_workers=4,
         collate_fn=padd_sentence_crf)
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-    model = LSTMCRF(len(word_2_idx) + 1, 100, 50, 2, tag_to_ix).to(device)
-    optimizer = torch.optim.Adam(model.parameters(), lr=0.01)
-    x = []
-    y = []
-    for epoch in tqdm(range(50)):
-        total_loss = 0
-        for s, t, l in dataloader:
-            model.zero_grad()
-            l = torch.tensor(l, dtype=torch.long)
-            loss = model.neg_log_likehood(
-                s.to(device), t.to(device), l.to(device))
-            loss.backward(retain_graph=True)
-            optimizer.step()
-            total_loss = total_loss + loss
-        x.append(epoch)
-        y.append(total_loss)
-    plt.plot(x, y, 'ro-')
-    plt.title('loss function')
-    plt.xlabel('iteration')
-    plt.ylabel('loss')
-    plt.legend()
-    plt.show()
+    model = torch.load('CRF')
+    correct = 0.0
+    number = 0.0
+    for s, t, l in dataloader:
+        l = torch.tensor(l, dtype=torch.long)
+        t = t.to(device)
+        score, tag = model(s.to(device), l.to(device))
+        for i in range(len(tag)):
+            if tag[i] == t.squeeze(0)[i]:
+                correct = correct + 1
+        number = number + t.size(1)
+        print(correct / number)
+    # model = LSTMCRF(len(word_2_idx) + 1, 100, 50, 2, tag_to_ix).to(device)
+    # optimizer = torch.optim.Adam(model.parameters(), lr=0.01)
+    # x = []
+    # y = []
+    # for epoch in tqdm(range(100)):
+    #     total_loss = 0
+    #     for s, t, l in dataloader:
+    #         model.zero_grad()
+    #         l = torch.tensor(l, dtype=torch.long)
+    #         loss = model.neg_log_likehood(
+    #             s.to(device), t.to(device), l.to(device))
+    #         loss.backward(retain_graph=True)
+    #         optimizer.step()
+    #         total_loss = total_loss + loss
+    #     x.append(epoch)
+    #     y.append(total_loss)
+    # torch.save(model, 'CRF')
+    # plt.plot(x, y, 'ro-')
+    # plt.title('loss function')
+    # plt.xlabel('iteration')
+    # plt.ylabel('loss')
+    # plt.legend()
+    # plt.show()
