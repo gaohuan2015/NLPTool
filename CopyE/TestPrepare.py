@@ -10,7 +10,7 @@ class TestPrepareFunc(unittest.TestCase):
 
     def test_loadwordembedding(self):
         path = '/Data/words2id.json'
-        dic = pre.load_dic_from_json(path)
+        dic = pre.load_wordembedding_from_json(path)
         self.assertEqual(len(dic), 90760)
 
     def test_loaddata(self):

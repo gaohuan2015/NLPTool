@@ -9,15 +9,18 @@ if __name__ == "__main__":
     tag_to_ix = {"b": 0, "i": 1, "o": 2, "<start>": 3, "<stop>": 4, "<pad>": 5}
     # read data
     training_data = [
-        "the wall street journal reported today that apple corporation made money",
-        "georgia tech is a university in georgia",
-        'Jean Pierre lives in New York',
-        'The European Union is a political and economic union',
-        'A French American actor won an oscar'
+        "the wall street journal reported is good",
+        "georgia tech is a bad university",
+        'Jean Pierre lives in a New York city',
+        'The European Union is a political union',
+        'A French American actor won 1997 cup'
     ]
     tag_data = [
-        "B I I I O O O B I O O", "B I O O O O B", "B I O O B I",
-        "O B I O O O O O O", "O B I O O O O"
+        "B I I I O O O", 
+        "B I O O O O", 
+        "B I O O O B I O", 
+        "O B I O O O O",
+        "O B I O O O O"
     ]
     sentences_to_id = []
     tag_to_id = []

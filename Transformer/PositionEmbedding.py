@@ -21,3 +21,4 @@ class PositionEmbedding(nn.Module):
         x = x + Variable(self.pe[:, :x.size(1)],
                          requires_grad=False)
         return self.dropout(x)
+
