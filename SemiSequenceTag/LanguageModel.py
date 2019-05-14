@@ -14,11 +14,12 @@ class LanguageModel(nn.Module):
         self.layer_num = layer_num
         self.hidden_dim = hidden_dim
         self.embed = nn.Embedding(vocab_size, embed_dim)
-        self.lstm = nn.LSTM(embed_dim,
-                            hidden_dim // 2,
-                            layer_num,
-                            batch_first=True,
-                            bidirectional=True)
+        self.lstm = nn.LSTM(
+            embed_dim,
+            hidden_dim // 2,
+            layer_num,
+            batch_first=True,
+            bidirectional=True)
         self.line = nn.Linear(hidden_dim, vocab_size)
 
     def init_weight(self, data):
@@ -31,9 +32,8 @@ class LanguageModel(nn.Module):
     def forward(self, x, length):
         h = self.init_weight(x)
         embed = self.embed(x)
-        packed_embedding = rnn_utils.pack_padded_sequence(embed,
-                                                          length,
-                                                          batch_first=True)
+        packed_embedding = rnn_utils.pack_padded_sequence(
+            embed, length, batch_first=True)
         out, _ = self.lstm(packed_embedding, h)
         sentence_embeddng, out_len = rnn_utils.pad_packed_sequence(
             out, batch_first=True)
@@ -53,11 +53,12 @@ if __name__ == "__main__":
         s = 'bos ' + s.strip('\n') + ' eos'
         sentences_to_id.append(prepare_sequence(s, word_2_idx))
     training_data = UnlabelData(sentences_to_id)
-    dataloader = data.DataLoader(training_data,
-                                 batch,
-                                 shuffle=False,
-                                 num_workers=4,
-                                 collate_fn=padd_sentence)
+    dataloader = data.DataLoader(
+        training_data,
+        batch,
+        shuffle=False,
+        num_workers=4,
+        collate_fn=padd_sentence)
     # build model
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     model = LanguageModel(len(word_2_idx) + 3, 100, 50, 2).to(device)
@@ -65,14 +66,14 @@ if __name__ == "__main__":
     p = torch.optim.Adam(model.parameters(), 0.001)
     x = []
     y = []
-    for i in tqdm(range(200)):
+    for i in tqdm(range(50)):
         total_loss = 0
         for data, length in dataloader:
             p.zero_grad()
             train = data[:, 0:data.size(-1) - 1].to(device)
             target = data[:, 1:data.size(-1)].reshape(-1).to(device)
-            predict = model(train,
-                            length).reshape(train.size(0) * train.size(1), -1)
+            predict = model(train, length).reshape(
+                train.size(0) * train.size(1), -1)
             loss = c(predict, target)
             total_loss = total_loss + loss
             loss.backward()

@@ -21,20 +21,23 @@ class LSTMCRF(nn.Module):
         self.tag_to_idx = tag_to_idx
         self.tag_size = len(tag_to_idx)
         self.embedding_layer = nn.Embedding(vocab_size, embedding_size)
-        self.lstm = nn.LSTM(embedding_size,
-                            hidden_size // 2,
-                            layer_number,
-                            batch_first=True,
-                            bidirectional=True)
+        self.lstm = nn.LSTM(
+            embedding_size,
+            hidden_size // 2,
+            layer_number,
+            batch_first=True,
+            bidirectional=True)
         self.hid2tag = nn.Linear(hidden_size, self.tag_size)
         device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         self.transition = nn.Parameter(
             torch.randn(self.tag_size, self.tag_size)).to(device)
         self.transition[tag_to_idx[self.start_tag], :] = -10000
         self.transition[:, tag_to_idx[self.end_tag]] = -10000
-        self.transition[tag_to_idx[self.pad_tag], :] = 0
-        self.transition[:, tag_to_idx[self.pad_tag]] = 0
-        
+        self.transition[tag_to_idx[self.pad_tag], :] = -10000
+        self.transition[:, tag_to_idx[self.pad_tag]] = -10000
+        self.transition[tag_to_idx[self.end_tag], tag_to_idx[self.pad_tag]] = 0
+        self.transition[tag_to_idx[self.start_tag], tag_to_idx[self.pad_tag]] = 0
+
     def init_weight(self, data):
         device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         return (torch.randn(self.layer_num * 2, data.shape[0],
@@ -45,9 +48,8 @@ class LSTMCRF(nn.Module):
     def lstm_feature(self, x, length):
         h = self.init_weight(x)
         embed = self.embedding_layer(x)
-        packed_embedding = rnn_utils.pack_padded_sequence(embed,
-                                                          length,
-                                                          batch_first=True)
+        packed_embedding = rnn_utils.pack_padded_sequence(
+            embed, length, batch_first=True)
         out, _ = self.lstm(packed_embedding, h)
         out, _ = rnn_utils.pad_packed_sequence(out, batch_first=True)
         tag_score = self.hid2tag(out)
@@ -93,15 +95,14 @@ class LSTMCRF(nn.Module):
         init_alphas[:, self.tag_to_idx[self.start_tag]] = 0
         forward_var = autograd.Variable(init_alphas)
         forward_var = forward_var.to(device)
-
         for feature in lstm_feature.permute(1, 0, 2):
             alphas = []
             for next_tag in range(self.tag_size):
-                emition_scoare = feature[:, next_tag].view(
+                emtion_score = feature[:, next_tag].view(
                     batch_size, -1).expand(batch_size, self.tag_size)
                 transition_score = self.transition[next_tag].view(
                     1, -1).expand(batch_size, self.tag_size)
-                score = transition_score + emition_scoare
+                score = transition_score + emtion_score
                 next_tag_var = torch.add(forward_var, score)
                 alphas.append(
                     self.log_exp_sum(next_tag_var).view(batch_size, -1))
@@ -143,7 +144,6 @@ class LSTMCRF(nn.Module):
         best_path.reverse()
         return path_score, best_path
 
-
     def forward(self, x, len):
         lstm = self.lstm_feature(x, len)
         score, tag = self.viterbi_decode(lstm)
@@ -151,20 +151,23 @@ class LSTMCRF(nn.Module):
 
 
 if __name__ == "__main__":
-    batchsize = 1
+    batchsize = 3
     word_2_idx = {}
     tag_to_ix = {"b": 0, "i": 1, "o": 2, "<start>": 3, "<stop>": 4, "<pad>": 5}
     # read data
     training_data = [
-        "the wall street journal reported today that apple corporation made money",
-        "georgia tech is a university in georgia",
-        'Jean Pierre lives in New York',
-        'The European Union is a political and economic union',
-        'A French American actor won an oscar'
+        "the wall street journal reported is good",
+        "georgia tech is a bad university",
+        'Jean Pierre lives in a New York city',
+        'The European Union is a political union',
+        'A French American actor won 1997 cup'
     ]
     tag_data = [
-        "B I I I O O O B I O O", "B I O O O O B", "B I O O B I",
-        "O B I O O O O O O", "O B I O O O O"
+        "B I I I O O O", 
+        "B I O O O O", 
+        "B I O O O B I O", 
+        "O B I O O O O",
+        "O B I O O O O"
     ]
     sentences_to_id = []
     tag_to_id = []
@@ -173,23 +176,24 @@ if __name__ == "__main__":
         sentences_to_id.append(prepare_sequence(s, word_2_idx))
         tag_to_id.append(prepare_sequence(t, tag_to_ix))
     training = SequenceTag(sentences_to_id, tag_to_id)
-    dataloader = data.DataLoader(training,
-                                 batch_size=batchsize,
-                                 shuffle=False,
-                                 num_workers=4,
-                                 collate_fn=padd_sentence_crf)
+    dataloader = data.DataLoader(
+        training,
+        batch_size=batchsize,
+        shuffle=False,
+        num_workers=4,
+        collate_fn=padd_sentence_crf)
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     model = LSTMCRF(len(word_2_idx) + 1, 100, 50, 2, tag_to_ix).to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=0.01)
     x = []
     y = []
-    for epoch in tqdm(range(60)):
+    for epoch in tqdm(range(100)):
         total_loss = 0
         for s, t, l in dataloader:
             model.zero_grad()
             l = torch.tensor(l, dtype=torch.long)
-            loss = model.neg_log_likehood(s.to(device), t.to(device),
-                                          l.to(device))
+            loss = model.neg_log_likehood(
+                s.to(device), t.to(device), l.to(device))
             loss.backward(retain_graph=True)
             optimizer.step()
             total_loss = total_loss + loss
